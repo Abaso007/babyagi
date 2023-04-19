@@ -67,18 +67,16 @@ DOTENV_EXTENSIONS = os.getenv("DOTENV_EXTENSIONS", "").split(" ")
 ENABLE_COMMAND_LINE_ARGS = (
     os.getenv("ENABLE_COMMAND_LINE_ARGS", "false").lower() == "true"
 )
-if ENABLE_COMMAND_LINE_ARGS:
-    if can_import("extensions.argparseext"):
-        from extensions.argparseext import parse_arguments
+if ENABLE_COMMAND_LINE_ARGS and can_import("extensions.argparseext"):
+    from extensions.argparseext import parse_arguments
 
-        OBJECTIVE, INITIAL_TASK, OPENAI_API_MODEL, DOTENV_EXTENSIONS, BABY_NAME, COOPERATIVE_MODE, JOIN_EXISTING_OBJECTIVE = parse_arguments()
+    OBJECTIVE, INITIAL_TASK, OPENAI_API_MODEL, DOTENV_EXTENSIONS, BABY_NAME, COOPERATIVE_MODE, JOIN_EXISTING_OBJECTIVE = parse_arguments()
 
 # Load additional environment variables for enabled extensions
-if DOTENV_EXTENSIONS:
-    if can_import("extensions.dotenvext"):
-        from extensions.dotenvext import load_dotenv_extensions
+if DOTENV_EXTENSIONS and can_import("extensions.dotenvext"):
+    from extensions.dotenvext import load_dotenv_extensions
 
-        load_dotenv_extensions(DOTENV_EXTENSIONS)
+    load_dotenv_extensions(DOTENV_EXTENSIONS)
 
 
 # TODO: There's still work to be done here to enable people to get
@@ -142,7 +140,7 @@ class SingleTaskListStorage:
         return self.tasks.popleft()
 
     def is_empty(self):
-        return False if self.tasks else True
+        return not self.tasks
 
     def next_task_id(self):
         self.task_id_counter += 1
@@ -160,8 +158,6 @@ if COOPERATIVE_MODE in ['l', 'local']:
     sys.path.append(str(Path(__file__).resolve().parent))
     from extensions.ray_tasks import CooperativeTaskListStorage
     tasks_storage = CooperativeTaskListStorage(OBJECTIVE)
-elif COOPERATIVE_MODE in ['d', 'distributed']:
-    pass
 
 
 # Get embedding for the text
@@ -338,7 +334,7 @@ while True:
         # Print the task list
         print("\033[95m\033[1m" + "\n*****TASK LIST*****\n" + "\033[0m\033[0m")
         for t in tasks_storage.get_task_names():
-            print(" • "+t)
+            print(f" • {t}")
 
         # Step 1: Pull the first incomplete task
         task = tasks_storage.popleft()
@@ -358,10 +354,10 @@ while True:
         vector = get_ada_embedding(
             enriched_result["data"]
         )  # get vector of the actual result extracted from the dictionary
-        index.upsert(
-            [(result_id, vector, {"task": task["task_name"], "result": result})],
-      namespace=OBJECTIVE_PINECONE_COMPAT
-        )
+          index.upsert(
+              [(result_id, vector, {"task": task["task_name"], "result": result})],
+        namespace=OBJECTIVE_PINECONE_COMPAT
+          )
 
         # Step 3: Create new tasks and reprioritize task list
         new_tasks = task_creation_agent(
